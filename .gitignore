@@ -1,3 +1,15 @@
+*~
+.pl-history
+Makefile
+R.aux
+R.idx
+R.ilg
+R.ind
+R.log
+R.out
+config.log
+config.status
+configure
 autom4te.cache
 R.html
 R.pdf
