@@ -1,28 +1,28 @@
-:- use_module(library('R')).
-:- use_module(library(lists)).     % member/2.
-:- use_module(library(readutil)).     % read_line_to_codes/2.
+
+:- use_module(library(lists)).          % member/2.
+:- use_module(library(readutil)).       % read_line_to_codes/2.
 
 :- nl, nl.
-:- ( (current_prolog_flag(windows,true),\+ r_bin(test)) ->
-       write( 'As this session runs under MS Windows you need to first register' ),nl,
-       write( 'the location of the R executalbe using r_bin/1 before you can' ), nl,
-       write( 'the demos.' ),
-       nl, nl
-       ;
-       true
+:- ( r_bin(Rbin) ->
+          write( 'Will be using the R found at: ' ), nl,
+          write( Rbin ), nl, nl
+          ; 
+          write( 'This session cannot locate an R executable. Please register the location' ), nl,
+          write( 'of the R executalbe using r_bin/1 before you can run the demos.' ), nl, nl
    ).
 
 :- write( 'Demo predicates for R (r_session) package.' ), nl.
 :- write( 'See r_demo_1/0,...,r_demo_10/0.' ), nl.
-:- write( 'Also r_demo/0 for r_demo_1/0,...,r_demo_7/0 which are the main demos.' ), nl.
-:- write( 'r_demo_all/0 and r_demo_clauses/0 for r_demo_1,...,r_demo_10.' ), nl.
+:- write( 'The goal r_demo/0 is a shorthand for r_demo_1/0,...,r_demo_8/0 which are the main demos.' ), nl, nl.
+:- write( 'r_demo_all/0 and r_demo_clauses/0 for r_demo_1,...,r_demo_11.' ), nl.
 :- write( 'which include demos for some non-basic features.' ), nl.
-:- write( 'You need to look at the sources before running r_demo_8,9 and 10.' ).
+:- write( 'You need to look at the sources before running r_demo_8,9,10 and 11.' ).
 :- nl, nl.
 
 r_demo :-
      nl, nl,
-     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,r_demo_6,r_demo_7],
+     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,
+               r_demo_6,r_demo_7,r_demo_8],
      r_demo( Rdemos, false ).
 
 r_demo_all:-
@@ -141,9 +141,29 @@ r_demo_7 :-
      r_print( x ),
      r_close.
 
-%%% Cut-off
+r_session:settings(r_function_def(x11),width=5).      % ts1/0 and ts2/0.
+r_session:settings(r_function_def(x11),height=3.5).
+r_session:settings(atom_is_r_function,x11).
 
 r_demo_8 :-
+     write( 'Demo: settings/2, r_function_def/1 and atom_is_r_function/0.' ),
+     nl, nl,
+     r_open,
+     r_in( 'x11' ),
+     r_in(cars <- c(1, 3, 6, 4, 9) ),
+     r_in(pie(cars)),
+     write( 'Press Return to continue...' ), nl,
+     read_line_to_codes( user_input, _ ),
+     r_in( 'dev.off()' ),
+     r_in( x11(width=5,height=8) ),
+     r_in(pie(cars)),
+     write( 'Press Return to continue...' ), nl,
+     read_line_to_codes( user_input, _ ),
+     r_close.
+
+%%% Cut-off
+
+r_demo_9 :-
      write( 'Demo: reinstate on halt.' ), nl,
      write( 'This is no longer valid.' ), nl, nl,
      r_open( [at_r_halt(reinstate)] ),
@@ -156,14 +176,14 @@ r_demo_8 :-
      r_close.
 
 /* change 192.168.0.* to a host in your domain before running the following. */
-r_demo_9 :-
+r_demo_10 :-
      write( 'Demo: ssh on a machine with R on a different location.' ), nl, nl,
      r_open( [ssh('192.168.0.3')] ),
      r_in( I <- 0:14 ),
      write( 'I'(I) ), nl,
      r_close.
 
-r_demo_10 :-
+r_demo_11 :-
      write( 'Demo: ssh on a machine with explicit set of the remote R location.' ),
      nl, nl,
      r_bin( '/usr/local/users/nicos/local/bin/R' ),

@@ -1,6 +1,6 @@
 :- module( r_session,
           [
-               r_open/0, r_open/1,
+               r_open/0, r_open/1, r_start/0,
                r_close/0, r_close/1,
                r_in/1, r_in/2,
                r_push/1, r_push/2,
@@ -32,7 +32,11 @@
 :- dynamic( r_session/3 ).
 :- dynamic( r_session_history/2 ).
 :- dynamic( r_old_bin_warning_issued/1 ).
+:- dynamic( r_bin_takes_interactive/2 ).
 
+:- multifile settings/2.
+
+settings( '$r_internal_ignore', true ).   % just so we know settings is defined
 % Swi declaration:
 :- ensure_loaded( library(process) ).   % process_create/3.
 :- at_halt( r_close(all) ).
@@ -63,6 +67,12 @@ functions. We adicipate that of particular interest to Prolog programmers might 
 that the library can be used to create plots from Prolog objects.
 Notably creating plots from lists of numbers.
 
+There is a known issue with X11 when R is started without --interactive. R.pl runs by default
+the --interactive flag and try to surpress echo output. If you do get weird output, try 
+giving to r_open, option with(non_interactive). This is suboptimal for some tasks, but 
+might resolve other issues. There is a issue with Macs, where --interactive doesnot work. 
+On Macs, you should use with(non_interactive). This can also be achieved using settings/2.
+
 These capabilities are illustrated in the following example :
 
 ==
@@ -74,18 +84,22 @@ rtest :-
      r_in( x11(width=5,height=3.5) ),
      r_in( plot(x,y)),
      write( 'Press Return to continue...' ), nl,
-     read_line_to_codes( user, _ ),
+     read_line_to_codes( user_input, _ ),
      r_print( 'dev.off()' ),
      r_in( Y <- y ),
      write( y(Y) ), nl,
-     Z = [1,2,3,4,5,6,7,8,9],
+     findall( Zx, between(1,9,Zx), Z ),
      r_in( z <- Z ),
      r_print( z ),
+     r_in(cars <- c(1, 3, 6, 4, 9) ),
+     r_in(pie(cars)),
+     write( 'Press Return to continue...' ), nl,
+     read_line_to_codes( user_input, _ ),
      r_close.
 ==
 
 @author 	Nicos Angelopoulos
-@version	0:0:3
+@version	0:0:5
 @copyright	Nicos Angelopoulos
 @license	YAP: Artistic
 @see		ensure_loaded(library('../doc/packages/examples/R/r_demo.pl'))
@@ -94,7 +108,6 @@ rtest :-
 */
 
 %%% Section: Interface predicates
-
 
 %% r_bin( ?Rbin )
 %
@@ -137,6 +150,16 @@ r_bin( Rbin ) :-
 r_open :-
      r_open( [] ).
 
+%%   r_start
+% 
+%    Only start and session via r_open/1, if no open session existss.
+%
+r_start :-
+     default_r_session( _R ),
+     !.
+r_start :-
+     r_open.
+
 %% r_open( +Opts )
 %
 %   Open a new R session with optional list of arguments. Opts should be
@@ -151,7 +174,7 @@ r_open :-
 %	session (see default_r_session/1). Using A =   =z= will push the
 %	session to the bottom of the pile.
 %
-%	* at_r_halt(RHAction)
+%       * at_r_halt(RHAction)
 %	R slaves used to halt when they encounter  an error. 
 %    This is no longer the case but this option is still present in case
 %    it is useful in the future. This option provides a handle to changing
@@ -184,13 +207,17 @@ r_open :-
 %       the R binary. In MS windows Rbin should point to Rterm.exe. Also see r_bin/1.
 %
 %       * with(With)
-%       With is in [environ,restore,save]. The   default behaviour is to
-%       start the R executable  with  flags =|--no-environ --no-restore
+%       With is in [environ,non_interactive,restore,save]. The   default behaviour is to
+%       start the R executable  with  flags =|interactive --no-environ --no-restore
 %       --no-save|=. For each With value  found in Opts the corresponding
-%       =|--no-|= flag is removed.
+%       =|--no-|= flag is removed. In the case of non_interactive,  it removes the default --interactive.
+%       This makes the connection more robust, and allows proper x11 plots in linux.
+%       However you get alot all the echos of what you pipe in, back from R.
 %
 r_open( Opts ) :-
-     r_open_1( Opts, _R, false ).
+     findall( S, r_session:settings(r_open_opt,S), Set ), 
+     append( Opts, Set, All ),
+     r_open_1( All, _R, false ).
 
 %%   r_close
 %
@@ -255,6 +282,7 @@ r_push( R, RCmd ) :-
      r_streams( input, Streams, Ri ),
      r_input_normative( RCmd, RNrm ),
      write( Ri, RNrm ), nl( Ri ),
+     flush_output( Ri ),
      r_record_term( CopyThis, CopyTo, RNrm ).
 
 %%   r_out(+Rcmd,-Lines)
@@ -453,12 +481,14 @@ r_streams_data( error,  r(_,_,Re), Re ).
 %         R session associated data and Datum is its
 %         data item corresponding to data identifier
 %         DId. DId should be in
-%         [copy_to,copy_this,at_r_halt,opts].
+%         [at_r_halt,copy_to,copy_this,interactive,version,opts].
 %
-r_session_data( copy_to, rsdata(Copy,_,_,_), Copy ).
-r_session_data( copy_this, rsdata(_,This,_,_), This ).
-r_session_data( at_r_halt, rsdata(_,_,RHalt,_), RHalt ).
-r_session_data( opts, rsdata(_,_,_,Opts), Opts ).
+r_session_data( copy_to, rsdata(Copy,_,_,_,_,_), Copy ).
+r_session_data( copy_this, rsdata(_,This,_,_,_,_), This ).
+r_session_data( at_r_halt, rsdata(_,_,RHalt,_,_,_), RHalt ).
+r_session_data( interactive, rsdata(_,_,_,Ictv,_,_), Ictv).
+r_session_data( version, rsdata(_,_,_,Vers,_,_), Vers ).
+r_session_data( opts, rsdata(_,_,_,_,_,Opts), Opts ).
 
 %%   r_history
 %
@@ -493,7 +523,7 @@ r_history( R, History ) :-
 %         Installed version. Version is of the form Major:Minor:Fix,
 %         where all three are integers.
 %
-r_session_version( 0:0:3 ).
+r_session_version( 0:0:5 ).
 
 %% r_verbose( What, CutOff )
 %
@@ -543,7 +573,7 @@ r_verbosity( Level ) :-
      retractall( r_verbosity_level(_) ),
      assert( r_verbosity_level(Numeric) ).
 
-%% r_bin_version( -Version)
+%% r_bin_version( -Version )
 %
 %    Get the version of R binary identified by r_bin/1. Version will have the
 %    same structure as in r_session_version/1 ie M:N:F.
@@ -560,11 +590,69 @@ r_bin_version( Version ) :-
 r_bin_version( R, Version ) :-
      r_bin_version_pl( R, Version ).
 
+%% settings( +Setting, +Value )
+%
+%    Multifile hook-predicate that allows for user settings to sip through. Currently the following are recognised:
+%
+%       * r_open_opt
+%
+%    These come after any options given explicitly to r_open/1. For example on a Mac to avoid issue with --interactive  use the
+%    following before querring r_open/0,1.
+% ==
+%    :- multifile settings/2.
+%    r_session:settings(r_open_opt,with(non_interactive)).
+% ==
+% 
+%       * atom_is_r_function
+%                        expands atoms such as x11 to r function calls x11()
+% 
+%       * r_function_def/1
+%                        where the argument is an R function. This hook allows default argument values to R functions. 
+%                        Only Arg=Value pairs are allowed.
+%
+% ==
+% :- multifile settings/2.
+% r_session:settings(r_function_def(x11),width=5). 
+% 
+% ==
+
+ 
+
 %%% Section: Auxiliary predicates
 
 % Rcv == true iff r_open_1/3 is called from recovery.
 %
 r_open_1( Opts, Alias, Rcv ) :-
+     ssh_in_options_to_which( Opts, Host, Dir, Ssh ),
+     ( (memberchk(rbin(Rbin),Opts);locate_rbin(Ssh,Rbin)) ->
+          true
+          ;
+          fail_term( 'Use rbin/1 in r_open/n, or r_bin(\'Rbin\') or set R_BIN.' )
+     ),
+     r_bin_arguments( Opts, Rbin, OptRArgs, Interactive ),
+     % ( var(Harg) -> RArgs = OptRArgs; RArgs = [Host,Harg|OptRArgs] ),
+     ssh_conditioned_exec_and_args( Rbin, OptRArgs, Ssh, Dir, Host, Exec, Args ),
+     r_verbose( r_process( Exec, Args, Ri, Ro, Re ), 3 ),
+     r_process( Exec, Args, Ri, Ro, Re ),
+     RStreams = r(Ri,Ro,Re),
+     r_streams_set( Ri, Ro, Re ),
+     r_process_was_successful( Ri, Ro, Re, Interactive ),
+     r_open_opt_copy( Opts, CpOn, CpWh, Rcv ),
+     r_open_opt_at_r_halt( Opts, RHalt ),
+     opts_alias( Opts, Alias ),
+     r_bin_version( Rbin, RbinV ),
+     RData = rsdata(CpOn,CpWh,RHalt,Interactive,RbinV,Opts),
+     opts_assert( Opts, Alias, RStreams, RData ),
+     AtRH = at_r_halt(reinstate),
+     ( (memberchk(history(false),Opts),\+memberchk(AtRH,Opts)) ->
+               true
+               ;
+               retractall( r_session_history(Alias,_) ),
+               assert( r_session_history(Alias,[]) )
+     ),
+     !.   % swi leaves some weird backtrack point (sometimes)
+
+ssh_in_options_to_which( Opts, Host, Dir, Ssh ) :-
      ( options_have_ssh(Opts,Host,Dir) ->
           ( current_prolog_flag(windows,true) ->
                fail_term( ssh_option_not_supported_on_ms_windows )
@@ -573,17 +661,11 @@ r_open_1( Opts, Alias, Rcv ) :-
           )
           ;
           true
-     ),
-     ( (memberchk(rbin(Rbin),Opts);locate_rbin(Ssh,Rbin)) ->
-          true
-          ;
-          fail_term( 'Use rbin/1 in r_open/n, or r_bin(\'Rbin\') or set R_BIN.' )
-     ),
-     r_bin_arguments( Opts, Rbin, OptRArgs ),
-     % ( var(Harg) -> RArgs = OptRArgs; RArgs = [Host,Harg|OptRArgs] ),
+     ).
+
+ssh_conditioned_exec_and_args( Rbin, OptRArgs, Ssh, Dir, Host, Exec, Args ) :-
      ( var(Ssh) ->
-          Exec = Rbin,
-          Args = OptRArgs
+          Exec = Rbin, Args = OptRArgs
           ;
           Exec = Ssh,
           % atoms_concat( [' "cd ',Dir,'; ',Rbin,'"'], Harg ),
@@ -592,15 +674,9 @@ r_open_1( Opts, Alias, Rcv ) :-
           double_quote_on_yap( PreArgs, TailArgs ),
           Args = [Host|TailArgs]
           % atoms_concat( ['ssh ', Host,' "cd ',Dir,'; ',RBin,'"'], R )
-     ),
-     % atom_concat( PrvExec, RPsf, Exec ),
-     r_verbose( r_process( Exec, Args, Ri, Ro, Re ), 3 ),
-     r_process( Exec, Args, Ri, Ro, Re ),
-     RStreams = r(Ri,Ro,Re),
-     r_streams_set( Ri, Ro, Re ),
-     r_process_was_successful( Ri, Ro, Re ),
-     r_open_opt_copy( Opts, CpOn, CpWh, Rcv ),
-     r_open_opt_at_r_halt( Opts, RHalt ),
+     ).
+
+opts_alias( Opts, Alias ) :-
      ( memberchk(alias(Alias),Opts) ->
           ( var(Alias) ->
                r_session_skolem( Alias, 1 )
@@ -613,8 +689,9 @@ r_open_1( Opts, Alias, Rcv ) :-
           )
           ;
           r_session_skolem( Alias, 1 )
-     ),
-     RData = rsdata(CpOn,CpWh,RHalt,Opts),
+     ).
+
+opts_assert( Opts, Alias, RStreams, RData ) :-
      ( memberchk(assert(Assert),Opts) ->
           ( Assert == a ->
                asserta( r_session(Alias,RStreams,RData) )
@@ -627,13 +704,6 @@ r_open_1( Opts, Alias, Rcv ) :-
           )
           ;
           asserta( r_session(Alias,RStreams,RData) )
-     ),
-     AtRH = at_r_halt(reinstate),
-     ( (memberchk(history(false),Opts),\+memberchk(AtRH,Opts)) ->
-               true
-               ;
-               retractall( r_session_history(Alias,_) ),
-               assert( r_session_history(Alias,[]) )
      ).
 
 r_close_session( Alias, Streams, Data ) :-
@@ -643,6 +713,10 @@ r_close_session( Alias, Streams, Data ) :-
      r_session_data( copy_to, Data, CopyTo ),
      r_session_data( copy_this, Data, CopyThis ),
      write( Ri, 'q()' ), nl( Ri ),
+     flush_output( Ri ),
+     sleep(0.25),
+                  % 20101119, closing the stream straight away is probably causing
+                  % problems. R goes to 100% cpu and call never terminates.
      r_record_term( CopyThis, CopyTo, 'q()' ),
      ( (CopyTo=stream(CopyS),stream_property(CopyS,file_name(CopyF)),CopyF\==user)->
           close(CopyS)
@@ -661,24 +735,30 @@ r_in( R, RCmd, Halt ) :-
      r_lines_print( ReLns, error, user_error ),
      r_record_history( Halt, R, RCmd ),
      replace_variables( Rplc ),
-     call( HCall ).
+     call( HCall ),
+     !.   % swi leaves some weird backtrack poionts....
 
 r_push( R, RCmd, Rplc, RoLns, ReLns, Halt, HCall ) :-
      current_r_session( R, Streams, Data ),
      r_session_data( copy_to, Data, CopyTo ),
      r_session_data( copy_this, Data, CopyThis ),
+     r_session_data( interactive, Data, Ictv ),
      r_streams( input, Streams, Ri ),
+     r_streams( output, Streams, Ro ),
      r_input_normative( RCmd, R, 0, RNrm, Rplc, _ ),
+     % write( wrote(RNrm) ), nl,
      write( Ri, RNrm ), nl( Ri ),
+     flush_output( Ri ),
+     consume_interactive_line( Ictv, _, Ro ),
      r_record_term( CopyThis, CopyTo, RNrm ),
-     r_lines( Streams, error, ReLns ),
+     r_lines( Streams, error, Ictv, [], ReLns, IjErr ),
      r_halted( ReLns, R, Halt, HCall ),
      ( Halt == true ->
-          r_streams( output, Streams, Ro ),
-          r_read_lines( Ro, [], RoLns )
+          r_read_lines( Ro, [], [], RoLns )
           ;
-          r_lines( Streams, output, RoLns )
+          r_lines( Streams, output, Ictv, IjErr, RoLns, [] )
      ),
+     % consume_interactive_line( true, "message(\"prolog_eoc\")", Ro ),
      r_record_lines( RoLns, output, CopyTo ),
      r_record_lines( ReLns, error, CopyTo ),
      ( (Halt==true,CopyTo=stream(Cl)) -> close(Cl); true ).
@@ -790,7 +870,9 @@ r_input_normative( PrvThis, This ) :-
                     r_input_normative( Arg2, Arg2Nrm ),
                     atoms_concat( [Arg1Nrm,Name,Arg2Nrm], This )
                     ;
-                    r_input_normative_tuple( Args, Tuple ),
+                    r_function_has_default_args( Name, Defs ),
+                    cohese_r_function_args( Args, Defs, AllArgs ),
+                    r_input_normative_tuple( AllArgs, Tuple ),
                     atoms_concat( [Name,'(',Tuple,')'], This )
                )
                ;
@@ -798,10 +880,29 @@ r_input_normative( PrvThis, This ) :-
                     number_codes( PrvThis, ThisCs ),
                     atom_codes( This, ThisCs )
                     ;
-                    This = PrvThis
+                    ( ( atom_concat(Name,'()',PrvThis) ;
+                         (settings(atom_is_r_function,PrvThis),Name=PrvThis) )
+                              ->
+                              r_function_has_default_args_tuple( Name, Tuple ),
+                              ( Tuple \== '' -> 
+                                   atoms_concat( [Name,'(',Tuple,')'], This )
+                                   ;
+                                   This = PrvThis
+                              )
+                         ;
+                         This = PrvThis
+                    )
                )
           )
      ).
+
+r_function_has_default_args_tuple( This, Tuple ) :-
+     r_function_has_default_args( This, Args ),
+     r_input_normative_tuple( Args, Tuple ).
+
+r_function_has_default_args( This, Flat ) :-
+     findall( A, r_session:settings(r_function_def(This),A), Args ),
+     flatten( Args, Flat ).
 
 r_input_normative_tuple( [], '' ).
 r_input_normative_tuple( [H|T], Tuple ) :-
@@ -836,9 +937,9 @@ number_atom_to_codes( NorA, Codes ) :-
      !,
      atom_codes( NorA, Codes ).
 
-r_read_lines( Ro, TermLine, Lines ) :-
+r_read_lines( Ro, Ij, TermLine, Lines ) :-
      read_line_to_codes( Ro, Line ),
-     r_read_lines_1( Line, TermLine, Ro, Lines ).
+     r_read_lines_1( Line, TermLine, Ij, Ro, Lines ).
 
 r_halted( Lines, R, Halted, HCall ) :-
      last( Lines, "Execution halted" ),
@@ -899,7 +1000,6 @@ r_halted_recovery_action( fail, Alias, _Streams, _Data, Call ) :-
           % ;
           % true
      % ),
-     % trace,
      L='at_r_halt(fail): failure due to execution halted by slave on r_session',
      Call = fail_term( L:Alias ).
 r_halted_recovery_action( call(Call), _Alias, Streams, _Data, Call ) :-
@@ -936,14 +1036,34 @@ r_record_history( false, Alias, This ) :-
      assert( r_session_history(Alias,[This|Old]) ).
 r_record_history( false, _, _ ). % fold with true if assumption is correct
 
-r_read_lines_1( eof, _TermLine, _Ro, Lines ) :- !, Lines = [].
-r_read_lines_1( end_of_file, _TermLine, _Ro, Lines ) :- !, Lines = [].
-r_read_lines_1( [255], _TermLine, _Ro, Lines ) :- !, Lines = [].
+r_read_lines_1( eof, _TermLine, Ij, _Ro, Lines ) :- 
+     !,  
+     interject_error( Ij ),
+     Lines = [].
+r_read_lines_1( end_of_file, _TermLine, _Ij, _Ro, Lines ) :- !, Lines = [].
+r_read_lines_1( [255], _TermLine, _Ij, _Ro, Lines ) :- !, Lines = [].
      % yap idiosyncrasy
-r_read_lines_1( TermLine, TermLine, _Ro, Lines ) :- !, Lines = [].
-r_read_lines_1( Line, TermLine, Ro, [Line|Lines] ) :-
-     read_line_to_codes( Ro, NewLine ),
-     r_read_lines_1( NewLine, TermLine, Ro, Lines ).
+r_read_lines_1( TermLine, TermLine, Ij, _Ro, Lines ) :- 
+     !,
+     interject_error( Ij ),
+     Lines = [].
+r_read_lines_1( Line, TermLine, Ij, Ro, Lines ) :-
+     ( select(Line,Ij,RIj) ->
+          % atom_codes(Atom,Line),write( skipping_diagnostic(Atom) ), nl,
+          Lines = TLines,
+          read_line_to_codes( Ro, NewLine )
+          ;
+          RIj = Ij,
+          read_line_to_codes( Ro, NewLine ),
+          Lines = [Line|TLines]
+     ),
+     r_read_lines_1( NewLine, TermLine, RIj, Ro, TLines ).
+
+interject_error( [] ).
+interject_error( [H|T] ) :-
+     findall( X, (member(X,[H|T]),write(x(X)),nl), Xs ),
+     length( Xs, L ),
+     fail_term( above_lines_not_found_in_output(L) ).
 
 r_boolean( Boo, Rboo ) :-
      ( memberchk(Boo,[t,true,'TRUE']) ->
@@ -1065,23 +1185,33 @@ r_open_opt_at_r_halt( Opts, RHalt ) :-
 
 r_bin_arguments( Opts, _Rbin, _RArgs ) :-
      member( with(With), Opts ),
-     \+ memberchk(With, [environ,restore,save] ),
+     \+ memberchk(With, [environ,non_interactive,restore,save] ),
      !,
      fail_term( 'Cannot decipher argument to option with/1': With ).
-r_bin_arguments( Opts, Rbin, Args ) :-
+r_bin_arguments( Opts, _Rbin, Args, Interactive ) :-
      ( current_prolog_flag(windows,true) ->
-          Args = ['--ess','--slave'|RArgs]
+          Args = ['--ess','--slave'|RArgs],
+          Interactive = false,
+          NonIOpts = Opts
           ; % assuming unix here, --interactive is only supported on these
-          r_bin_version( Rbin, Version ),
-          % Issue is present on 2:9:2
-          ( 2:9:10 @< Version ->
+          /*
+          decided to scrap this, is still accessile via option with/1
+          ( r_bin_takes_interactive(Rbin) ->
                Args = ['--interactive','--slave'|RArgs]
                ;
-               r_old_bin_warning( Version ),
-               Args = ['--slave'|RArgs]
+               Args = ['`--slave'|RArgs]
+          )
+          */
+          ( select(with(non_interactive),Opts,NonIOpts) -> 
+               Args = ['--slave'|RArgs],
+               Interactive = false
+               ;
+               NonIOpts = Opts,
+               Args = ['--interactive','--slave'|RArgs],
+               Interactive = true
           )
      ),
-     findall( W, member(with(W),Opts), Ws ),
+     findall( W, member(with(W),NonIOpts), Ws ),
      sort( Ws, Sr ),
      length( Ws, WsL ),
      length( Sr, SrL ),
@@ -1102,10 +1232,15 @@ r_opt_exec_no( [H|T], Ws, Exec ) :-
      ),
      r_opt_exec_no( T, Ws, TExec ).
 
-r_bin_arguments_complement( [], _Ws, [] ).
+r_bin_arguments_complement( [], Ws, [] ) :-
+     ( Ws == [] -> 
+          true
+          ;
+          write( user_error, unrecognized_with_opts(Ws) ),
+          nl( user_error )
+     ).
 r_bin_arguments_complement( [H|T], Ws, Args ) :-
      ( memberchk(H,Ws) ->
-          % we could add explicit --with- here ?
           Args = TArgs
           ;
           atom_concat( '--no-', H, NoH ),
@@ -1170,19 +1305,36 @@ fail_term( Term ) :-
      ),
      nl( user_error ), fail.
 
-r_lines( Streams, ROstream, Lines ) :-
+r_lines( Streams, ROstream, Interactive, InJ, Lines, ToInterj ) :-
      r_streams_data( input,  Streams, Ri ),
      r_streams_data( ROstream,  Streams, Ro ),
      ( ROstream == error ->
           Mess = 'message("prolog_eoc")',
-          Trmn = "prolog_eoc"
+          Trmn = "prolog_eoc",
+          r_streams_data( output,  Streams, Ruo ), 
+          AllIj = InJ
           ;
+          Ruo = Ro,
           Mess = 'print("prolog_eoc")',
-          Trmn = "[1] \"prolog_eoc\""
+          Trmn = "[1] \"prolog_eoc\"", 
+          ( Interactive == true -> 
+               append( InJ, ["print(\"prolog_eoc\")"], AllIj )
+               ;
+               AllIj = InJ
+          )
      ),
      Excp = error(io_error(write, _), context(_,_)),
-     catch( (write(Ri,Mess),nl(Ri)), Excp, true ),
-     r_read_lines( Ro, Trmn, Lines ).
+     catch( (write(Ri,Mess),nl(Ri),flush_output(Ri)), Excp, true ),
+     atom_codes( Mess, MessLine ),
+     r_read_lines( Ro, AllIj, Trmn, Lines ),
+     % read_line_to_codes( Ro, Line ), atom_codes( AtLine, Line ), atom_codes( AtTrmn, Trmn ),
+     % write( nxt_was(AtLine,AtTrmn) ), nl,
+     ( (Interactive == true, ROstream == error) -> 
+               ToInterj = [MessLine]
+               ;
+               % consume_interactive_line( true, MessLine, Ruo ),
+               ToInterj = []
+     ).
 
 r_lines_print_type_stream( output, user_output ).
 r_lines_print_type_stream( error, user_error ).
@@ -1198,11 +1350,12 @@ r_session_skolem( Alias, I ) :-
      NxI is I + 1,
      r_session_skolem( Alias, NxI ).
 
-r_process_was_successful( Ri, Ro, Re ) :-
+r_process_was_successful( Ri, Ro, Re, Interactive ) :-
      Mess = 'message("prolog_eoc")',
      Trmn = "prolog_eoc",
-     catch( (write(Ri,Mess),nl(Ri)), Excp, true ),
-     r_read_lines( Re, Trmn, Lines ),
+     catch( (write(Ri,Mess),nl(Ri),flush_output(Ri)), Excp, true ),
+     r_read_lines( Re, [], Trmn, Lines ),
+     consume_interactive_line( Interactive, "message(\"prolog_eoc\")", Ro ),
      r_lines_print( Lines, error, user_error ),
      ( (var(Excp),Lines==[]) ->
           true
@@ -1250,8 +1403,11 @@ options_have_ssh( Opts, Host, Dir ) :-
 locate_rbin( Ssh, RBin ) :-
      locate_rbin_file( File ),
      ( var(Ssh) ->
-          ( current_prolog_flag(windows,true) -> Exe='exe'; Exe='' ),
-          file_name_extension( File, Exe, RBin ),
+          ( current_prolog_flag(windows,true) ->
+               file_name_extension( File, 'exe', RBin )
+               ; 
+               RBin = File
+          ),
           exists_file( RBin )
           ;
           % currently when we using ssh, there is no check for existance
@@ -1303,16 +1459,68 @@ integers_list_to_integer( [H|T], Pow, Spc, Acc, Int ) :-
      Red is Pow - 1,
      integers_list_to_integer( T, Red, Spc, Nxt, Int ).
 
-r_old_bin_warning( Version ) :-
-     ( r_old_bin_warning_issued( true ) ->
+r_bin_warning :-
+     write('Flag --interactive which is used when starting R sessions,'),
+     nl,
+     write( 'is not behaving as expected on your installed R binary.' ), nl,
+     write( 'R sessions with this binary will be started without this flag.' ),
+     nl, 
+     write( 'As a result, graphic windows will suffer and the connection is' ),
+     write( ' more flaky.' ), nl,
+     write( 'If you want to overcome these limitations we strongly suggest' ),
+     nl,
+     write( 'the installation of R from sources.' ), nl, nl.
+
+r_bin_takes_interactive( Rbin ) :-
+     r_bin_takes_interactive( Rbin, Bool ),
+     !,
+     Bool == true.
+r_bin_takes_interactive( Rbin ) :-
+     Args = ['--interactive','--slave','--no-environ','--no-restore','--no-save'],
+     r_process( Rbin, Args, Ri, Ro, Re ),
+     r_streams_set( Ri, Ro, Re ),
+     % Streams = r(Ri,Ro,Re),
+     write( Ri, 'print("whatever")' ), nl( Ri ),
+     flush_output( Ri ),
+     % r_read_lines( Re, eof, RoLns ),
+     % read_line_to_codes( Re, _ReLns ),
+     % r_lines( Streams, error, ReLns ),
+     % r_lines( Streams, output, RoLns ),
+     read_line_to_codes( Ro, RoLn ),
+     ( append("print", _, RoLn ) ->
+          r_bin_warning,
+          Bool = false
+          ;
+          Bool = true
+     ),
+     assert( r_bin_takes_interactive(Rbin,Bool) ),
+     write( Ri, 'q()' ), nl( Ri ),
+     flush_output( Ri ),
+     read_line_to_codes( Re, _ReLn ), 
+     % write( Ri, 'message("whatever")' ), nl( Ri ),
+     close( Ri ), close( Ro ), close( Re ),
+     Bool == true.
+
+consume_interactive_line( true, Line, Rstream ) :-
+     read_line_to_codes( Rstream, Codes ),
+     atom_codes( Found, Codes ),
+     % ( var(Line) -> write( consuming_var(Found) ), nl; true ),
+     ( Codes = Line -> 
           true
           ;
-          assert( r_old_bin_warning_issued(true) ),
-          write( 'Flag --interactive which is used by R.pl when starting R, is in your R version, ' ), write( Version ), 
-          write( ', behaving differently than in later versions.' ), nl,
-          write( 'There will be limited functionality of interactive graphics.'),
-          nl, nl
+          atom_codes( Atm, Line ),
+          fail_term(could_not_conusme_specific_echo_line(Atm)-Found )
      ).
+consume_interactive_line( false, _, _ ).
+
+cohese_r_function_args( [], Defs, Defs ).
+cohese_r_function_args( [H|T], Defs, [H|R] ) :-
+     ( (\+ var(H), H = (N=_V),select(N=_V1,Defs,RemDefs)) -> 
+               true
+               ;
+               RemDefs = Defs
+     ),
+     cohese_r_function_args( T, RemDefs, R ).
 % Section: Swi Specifics.
 
 /*
@@ -1351,8 +1559,16 @@ r_process( R, Args, Ri, Ro, Re ) :-
      process_create( R, Args, Streams ),
      r_verbose( created(R,Args,Streams), 3 ).
 
-r_bin_version_pl( R, Mj:Mn:Fx ) :-
+r_bin_version_pl( R, Vers ) :-
      Streams = [stdout(pipe(Ro))],
+     r_bin_version_pl_stream( R, Streams, Ro, Vers ),
+     !.
+%  2:12:1 on windows talks to error... :(
+r_bin_version_pl( R, Vers ) :-
+     Streams = [stderr(pipe(Ro))],
+     r_bin_version_pl_stream( R, Streams, Ro, Vers ).
+
+r_bin_version_pl_stream( R, Streams, Ro, Mj:Mn:Fx ) :-
      process_create( R, ['--version'], Streams ),
      % read_line_to_codes( Ro, _ ),
      read_line_to_codes( Ro, Codes ),
@@ -1369,7 +1585,19 @@ r_expand_wins_rterm( Stem, Candidates ) :-
      Stem = 'C:/Program Files/R/R-',
      Psfx = '*/bin/Rterm.exe',
      atom_concat( Stem, Psfx, Search ),
-     expand_file_name( Search, Candidates ).
+     expand_file_name( Search, Candidates1 ),
+     % on 64 bit machines Rterm.exe is placed in subdir R-1.12.1
+     Psfx2= '*/bin',
+     atom_concat( Stem, Psfx2, SearchBin ), 
+     expand_file_name( SearchBin, BinFolders ),
+     findall( CandidateList, (
+                                   member(Bin,BinFolders),
+                                   atom_concat( Bin, '/*/Rterm.exe', NestSearch ), 
+                                   expand_file_name( NestSearch, CandidateList )
+                              ),
+                                        NestedCandidates ),
+     flatten( [Candidates1|NestedCandidates], Candidates ).
+
 
 
 environ( Var, Val ) :-
