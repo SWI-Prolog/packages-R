@@ -99,7 +99,7 @@ rtest :-
 ==
 
 @author 	Nicos Angelopoulos
-@version	0:0:5
+@version	0:0:6
 @copyright	Nicos Angelopoulos
 @license	YAP: Artistic
 @see		ensure_loaded(library('../doc/packages/examples/R/r_demo.pl'))
@@ -523,7 +523,7 @@ r_history( R, History ) :-
 %         Installed version. Version is of the form Major:Minor:Fix,
 %         where all three are integers.
 %
-r_session_version( 0:0:5 ).
+r_session_version( 0:0:6 ).
 
 %% r_verbose( What, CutOff )
 %
@@ -775,8 +775,10 @@ r_out_halted_record( false, _Alias, Lines ) :-
 
 r_flush_onto_1( [], _R, [] ).
 r_flush_onto_1( [H|T], R, [HOn|TOns] ) :-
-     current_r_session( R, Streams, _ ),
-     r_lines( Streams, H, HOn ),
+     current_r_session( R, Streams, Data ),
+     r_session_data( interactive, Data, Ictv ),
+     r_lines( Streams, output, Ictv, [], H, HOn ),
+     % r_lines( Streams, H, HOn ),
      r_flush_onto_1( T, R, TOns ).
 
 replace_variables( [] ).
@@ -975,8 +977,10 @@ r_halted_recovery_action( restart, Alias, _Streams, Data, RecCall ) :-
           true
      ),
      r_open_1( Opts, Alias, true ),
-     current_r_session( Alias, Streams, _ ),
-     r_lines( Streams, output, _ReLines ).
+     current_r_session( Alias, Streams, Data ),
+     r_session_data( interactive, Data, Ictv ),
+     r_lines( Streams, output, Ictv, [], _H, _ ).
+     % r_lines( Streams, output, _ReLines ).
 r_halted_recovery_action( reinstate, Alias, _Streams, Data, RecCall ) :-
      ( r_session_history(Alias,History) ->
           r_session_data( opts, Data, Opts ),
@@ -1403,8 +1407,13 @@ options_have_ssh( Opts, Host, Dir ) :-
 locate_rbin( Ssh, RBin ) :-
      locate_rbin_file( File ),
      ( var(Ssh) ->
-          ( current_prolog_flag(windows,true) ->
-               file_name_extension( File, 'exe', RBin )
+          ( current_prolog_flag(windows,true),
+               ( atom_concat(_,exe,File) -> 
+                    RBin = File         % this if and its then part are only needed because
+                                        % currrent Yap implementation is broken
+                    ;
+                    file_name_extension( File, exe, RBin )
+               )
                ; 
                RBin = File
           ),
@@ -1597,8 +1606,6 @@ r_expand_wins_rterm( Stem, Candidates ) :-
                               ),
                                         NestedCandidates ),
      flatten( [Candidates1|NestedCandidates], Candidates ).
-
-
 
 environ( Var, Val ) :-
      \+ var(Var),
