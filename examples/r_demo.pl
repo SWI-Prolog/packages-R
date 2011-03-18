@@ -1,4 +1,4 @@
-
+% :- use_module(library('R')).
 :- use_module(library(lists)).          % member/2.
 :- use_module(library(readutil)).       % read_line_to_codes/2.
 
@@ -13,26 +13,25 @@
 
 :- write( 'Demo predicates for R (r_session) package.' ), nl.
 :- write( 'See r_demo_1/0,...,r_demo_10/0.' ), nl.
-:- write( 'The goal r_demo/0 is a shorthand for r_demo_1/0,...,r_demo_8/0 which are the main demos.' ), nl, nl.
-:- write( 'r_demo_all/0 and r_demo_clauses/0 for r_demo_1,...,r_demo_11.' ), nl.
-:- write( 'which include demos for some non-basic features.' ), nl.
-:- write( 'You need to look at the sources before running r_demo_8,9,10 and 11.' ).
+:- write( 'The goal r_demo/0 is a shorthand for r_demo_1/0,...,r_demo_9/0 which are the main demos.' ), nl, nl.
+:- write( 'r_demo_all/0 and r_demo_clauses/0 for r_demo_1,...,r_demo_12.' ), nl.
+:- write( 'include demos for some non-basic features.' ), nl.
+:- write( 'You need to look at the sources before running r_demo_10,11 and 12.' ).
 :- nl, nl.
 
 r_demo :-
      nl, nl,
-     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,
-               r_demo_6,r_demo_7,r_demo_8],
+     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,r_demo_6,r_demo_7,r_demo_8,r_demo_9],
      r_demo( Rdemos, false ).
 
 r_demo_all:-
      nl, nl,
-     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,r_demo_6,r_demo_7,r_demo_8,r_demo_9,r_demo_10],
+     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,r_demo_6,r_demo_7,r_demo_8,r_demo_9,r_demo_10,r_demo_11,r_demo_12],
      r_demo( Rdemos, false ).
 
 r_demo_clauses :-
      nl, nl,
-     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,r_demo_6,r_demo_7,r_demo_8,r_demo_9,r_demo_10],
+     Rdemos = [r_demo_1,r_demo_2,r_demo_3,r_demo_4,r_demo_5,r_demo_6,r_demo_7,r_demo_8,r_demo_9,r_demo_10,r_demo_11,r_demo_12],
      r_demo( Rdemos, true ).
 
 r_demo( Rdemos, Clauses ) :-
@@ -58,26 +57,26 @@ r_demo( _Rdemos, _ ) :-
 r_demo_1 :-
      write( 'Demo: basic vector interactions.' ), nl, nl,
      r_open,
-     r_in( x <- c(10.4, 5.6, 3.1, 6.4, 21.7) ),
+     x <- c(10.4, 5.6, 3.1, 6.4, 21.7),
      ( r_out( print(x), Lines ), r_lines_print( Lines ), fail; true ),
      r_print( x ),
      r_in( x ),
      r_in( (y <- c(6,5,4,3,2,1); y) ), % The extra paranthesis are only
                                        % needed for Yap.
-     r_in( Z <- c(10.4, 5.6, 3.1, 6.4, 21.7) ),
+     Z <- c(10.4, 5.6, 3.1, 6.4, 21.7),
      write( z(Z) ), nl,
      r_close.
 
 r_demo_2 :-
      write( 'Demo: plots (screen and postscript).' ), nl, nl,
      r_open,
-     r_in( y <- rnorm(50) ),
+     y <- rnorm(50),
      r_print( y ),
      r_in( Y <- y ),
      write( y(Y) ), nl,
-     r_in( x <- rnorm(y) ),
+     x <- rnorm(y),
      r_print( x ),
-     r_in( X <- x ),
+     X <- x,
      write( x(X) ), nl,
      r_in( x11(width=5,height=3.5) ),
      r_in( plot(x,y)),
@@ -141,29 +140,29 @@ r_demo_7 :-
      r_print( x ),
      r_close.
 
-r_session:settings(r_function_def(x11),width=5).      % ts1/0 and ts2/0.
-r_session:settings(r_function_def(x11),height=3.5).
-r_session:settings(atom_is_r_function,x11).
 
 r_demo_8 :-
-     write( 'Demo: settings/2, r_function_def/1 and atom_is_r_function/0.' ),
-     nl, nl,
+     write( 'Demo: 4x70 nulls matrix.' ), nl, nl,
      r_open,
-     r_in( 'x11' ),
-     r_in(cars <- c(1, 3, 6, 4, 9) ),
-     r_in(pie(cars)),
-     write( 'Press Return to continue...' ), nl,
-     read_line_to_codes( user_input, _ ),
-     r_in( 'dev.off()' ),
-     r_in( x11(width=5,height=8) ),
-     r_in(pie(cars)),
-     write( 'Press Return to continue...' ), nl,
-     read_line_to_codes( user_input, _ ),
+     x <- matrix(nrow=4,ncol=70),
+     X <- x,
+     write( x(X) ), nl,
      r_close.
+
+r_demo_9 :-
+     write( 'Demo: list of 3 4x70 nulls matrices.' ), nl, nl,
+     r_open,
+     l <- 'list()',
+     r_in( 'for (i in 1:3) l[[i]] <- matrix(nrow=4,ncol=70)' ),
+     L <- l,
+     write( l(L) ), nl,
+     r_close.
+
+
 
 %%% Cut-off
 
-r_demo_9 :-
+r_demo_10 :-
      write( 'Demo: reinstate on halt.' ), nl,
      write( 'This is no longer valid.' ), nl, nl,
      r_open( [at_r_halt(reinstate)] ),
@@ -176,14 +175,14 @@ r_demo_9 :-
      r_close.
 
 /* change 192.168.0.* to a host in your domain before running the following. */
-r_demo_10 :-
+r_demo_11 :-
      write( 'Demo: ssh on a machine with R on a different location.' ), nl, nl,
      r_open( [ssh('192.168.0.3')] ),
      r_in( I <- 0:14 ),
      write( 'I'(I) ), nl,
      r_close.
 
-r_demo_11 :-
+r_demo_12 :-
      write( 'Demo: ssh on a machine with explicit set of the remote R location.' ),
      nl, nl,
      r_bin( '/usr/local/users/nicos/local/bin/R' ),

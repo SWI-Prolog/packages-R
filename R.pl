@@ -19,6 +19,7 @@
                r_bin/1,
                r_bin_version/1, r_bin_version/2,
                r_verbosity/1,
+               '<-'/2,
                op( 950, xfx, (<-) )
           ] ).
 
@@ -57,8 +58,9 @@ inputs. Thus, Prolog term =|x <- c(1,2,3)|= is translated to atomic =|'x
 <- c(1,2,3)'|= which is then passed on to R. That is, =|<-|= is a
 defined/recognised operator. =|X <- c(1,2,3)|=, where X is a variable,
 instantiates X to the list =|[1,2,3]|=. Also 'Atom' <- [x1,...,xn]
-translates to R code: Atom <- c(x1,...,xn). Currently only vectors can be
-translated in this fashion.
+translates to R code: Atom <- c(x1,...,xn). Currently vectors, matrices
+and (R)-lists are translated in this fashion.  The goal "A <- B" translates to
+r_in( A <- B ).
 
 Although the library is primarily meant to be used as a research tool,
 it still provides access to many functions of the R system that may render it 
@@ -78,20 +80,20 @@ These capabilities are illustrated in the following example :
 ==
 rtest :-
      r_open,
-     r_in( y <- rnorm(50) ),
+     y <- rnorm(50),
      r_print( y ),
-     r_in( x <- rnorm(y) ),
+     x <- rnorm(y),
      r_in( x11(width=5,height=3.5) ),
-     r_in( plot(x,y)),
+     r_in( plot(x,y) ),
      write( 'Press Return to continue...' ), nl,
      read_line_to_codes( user_input, _ ),
      r_print( 'dev.off()' ),
-     r_in( Y <- y ),
+     Y <- y,
      write( y(Y) ), nl,
      findall( Zx, between(1,9,Zx), Z ),
-     r_in( z <- Z ),
+     z <- Z,
      r_print( z ),
-     r_in(cars <- c(1, 3, 6, 4, 9) ),
+     cars <- c(1, 3, 6, 4, 9),
      r_in(pie(cars)),
      write( 'Press Return to continue...' ), nl,
      read_line_to_codes( user_input, _ ),
@@ -99,12 +101,11 @@ rtest :-
 ==
 
 @author 	Nicos Angelopoulos
-@version	0:0:6
+@version	0:0:7
 @copyright	Nicos Angelopoulos
 @license	YAP: Artistic
 @see		ensure_loaded(library('../doc/packages/examples/R/r_demo.pl'))
 @see		http://www.r-project.org/
-@author		Windows-compatibility is based on work by `JAB'
 */
 
 %%% Section: Interface predicates
@@ -523,7 +524,7 @@ r_history( R, History ) :-
 %         Installed version. Version is of the form Major:Minor:Fix,
 %         where all three are integers.
 %
-r_session_version( 0:0:6 ).
+r_session_version( 0:0:7 ).
 
 %% r_verbose( What, CutOff )
 %
@@ -589,6 +590,9 @@ r_bin_version( Version ) :-
 %
 r_bin_version( R, Version ) :-
      r_bin_version_pl( R, Version ).
+
+'<-'( X, Y ) :-
+     r_in( X <- Y ).
 
 %% settings( +Setting, +Value )
 %
@@ -784,7 +788,7 @@ r_flush_onto_1( [H|T], R, [HOn|TOns] ) :-
 replace_variables( [] ).
 replace_variables( [arp(R,Pv,Rv)|T] ) :-
      r_out( R, Rv, Lines ),
-     r_read_list( Lines, Pv ),
+     r_read_obj( Lines, Pv ),
      % r_lines_to_pl_var( Lines, Pv ),
      replace_variables( T ).
 
@@ -1077,8 +1081,62 @@ r_boolean( Boo, Rboo ) :-
           Rboo = 'FALSE'
      ).
 
-r_read_list( [], [] ).
-r_read_list( [PreH|T], List ) :-
+/* r_read_obj( Lines, Pv ) :-
+     In X <- x  read R object x into prolog variable X.
+     Currently recognizes [[]] lists, matrices and vectors.
+     */
+r_read_obj( [L|Ls], Pv ) :-
+     r_head_line_recognizes_and_reads( L, Ls, Pv ).
+     
+% list
+r_head_line_recognizes_and_reads( [0'[,0'[|T], Ls, Pv ) :-
+     !,
+     break_list_on( T, 0'], Lname, RList ),
+     RList = [0']],   % do some error handling here
+     % break_list_on( Ls, [], Left, Right ),
+     r_read_obj_nest( Ls, Nest, Rem ),
+     name( K, Lname ),
+     Pv = [K-Nest|Rest],
+     r_read_list_remainder( Rem, Rest ).
+% vector
+r_head_line_recognizes_and_reads( Line, Ls, Pv ) :-
+     delete_leading( Line, 0' , NeLine ),
+     NeLine = [0'[|_],
+     !,
+     r_read_vect( [NeLine|Ls], PvPrv ),
+     ( PvPrv = [Pv] -> true; Pv = PvPrv ).
+% matrix
+% r_head_line_recognizes_and_reads( [0' ,0' ,0' ,0' ,0' |T], Ls, Pv ) :-
+r_head_line_recognizes_and_reads( [0' |T], Ls, Pv ) :-
+     % Five = [0' ,0' ,0' ,0' ,0' |T1],
+     r_read_vect_line( T, Cnames, [] ),
+     ( break_list_on(Ls,[0' |T1],Left,Right) ->
+          % maybe we can avoid coming here, this terminal has no width restriction...
+          read_table_section( Left, Rnames, Entries ),
+          r_head_line_recognizes_and_reads( [0' |T1], Right, PvT ),
+          % do loads of error checking from here on 
+          clean_up_matrix_headers( Rnames, NRnames ),
+          PvT = tbl(NRnames,CnamesR,MatR),
+          append_matrices_on_columns( Entries, MatR, Mat ),
+          append( Cnames, CnamesR, CnamesAll ),
+          clean_up_matrix_headers( CnamesAll, NCnamesAll ),
+          Pv = tbl(NRnames,NCnamesAll,Mat)
+
+          % r_read_vect( T1, Cnames2 ),
+          % read_table_sections( Right, Rnames, Cnames, Cnames2, T1, _HERE,  Ls, Pv )
+          ;
+          read_table_section( Ls, Rnames, Entries ),
+          clean_up_matrix_headers( Rnames, NRnames ),
+          clean_up_matrix_headers( Cnames, NCnames ),
+          Pv = tbl(NRnames,NCnames,Entries)
+     ).
+
+r_read_obj_nest( Ls, Nest, Rem ) :-
+     break_list_on( Ls, [], Left, Rem ),
+     r_read_obj( Left, Nest ).
+
+r_read_vect( [], [] ).
+r_read_vect( [PreH|T], List ) :-
      delete_leading( PreH, 0' , H ),
      ( H = [0'[|Hrm] ->
           break_list_on( Hrm, 0'], _, Hprv ),
@@ -1086,20 +1144,52 @@ r_read_list( [PreH|T], List ) :-
           ;
           Hproper = H
      ),
-     r_read_list_line( Hproper, List, ConTail ),
-     r_read_list( T, ConTail ).
+     r_read_vect_line( Hproper, List, ConTail ),
+     r_read_vect( T, ConTail ).
 
-r_read_list_line( [], List, List ).
-r_read_list_line( [0' |RRead], List, ConTail ) :-
+r_read_vect_line( [], List, List ).
+r_read_vect_line( [0' |RRead], List, ConTail ) :-
      !,
-     r_read_list_line( RRead, List, ConTail ).
-r_read_list_line( [Fst|RRead], [H|List], ConTail ) :-
+     r_read_vect_line( RRead, List, ConTail ).
+r_read_vect_line( [Fst|RRead], [H|List], ConTail ) :-
      break_list_on( RRead, 0' , RemCs, RemNumCs ),
      !,
-     number_codes( H, [Fst|RemCs] ),
-     r_read_list_line( RemNumCs, List, ConTail ).
-r_read_list_line( [Fst|RemCs], [H|List], List ) :-
-     number_codes( H, [Fst|RemCs] ).
+     % number_codes( H, [Fst|RemCs] ),
+     name( H, [Fst|RemCs] ),
+     r_read_vect_line( RemNumCs, List, ConTail ).
+r_read_vect_line( [Fst|RemCs], [H|List], List ) :-
+     name( H, [Fst|RemCs] ).
+     % number_codes( H, [Fst|RemCs] ).
+
+r_read_list_remainder( [], [] ).
+r_read_list_remainder( [H|T], Rest ) :-
+     H = [0'[,0'[|_],
+     r_head_line_recognizes_and_reads( H, T, Rest ).
+
+read_table_section( [], [], [] ).
+read_table_section( [L|Ls], [H|Hs], [Es|TEs] ) :-
+     r_read_vect_line( L, [H|Es], [] ),
+     read_table_section( Ls, Hs, TEs ).
+
+clean_up_matrix_headers( [], [] ).
+clean_up_matrix_headers( [H|T], [F|R] ) :-
+     ( (atom_concat('[',X,H),atom_concat(Y,',]',X)) ->
+          atom_codes( Y, YCs ),
+          number_codes( F, YCs )
+          ;
+          ( (atom_concat('[,',X,H),atom_concat(Y,']',X)) ->
+               atom_codes( Y, YCs ),
+               number_codes( F, YCs )
+               ;
+               F=H
+          )
+     ),
+     clean_up_matrix_headers( T, R ).
+
+append_matrices_on_columns( [], [], [] ).
+append_matrices_on_columns( [H1|T1], [H2|T2], [H3|T3] ) :-
+     append( H1, H2, H3 ),
+     append_matrices_on_columns( T1, T2, T3 ).
 
 r_streams( [], _R, [] ).
 r_streams( [H|T], R, [SH|ST] ) :-
