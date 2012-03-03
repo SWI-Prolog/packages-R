@@ -1,3 +1,34 @@
+/*  Part of SWI-Prolog
+
+    Author:        Nicos Angelopoulos
+    WWW:           http://www.swi-prolog.org
+    Copyright (C): Nicos Angelopoulos
+
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; either version 2
+    of the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+    As a special exception, if you link this library with other files,
+    compiled with a Free Software compiler, to produce an executable, this
+    library does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however
+    invalidate any other reasons why the executable file might be covered by
+    the GNU General Public License.
+
+    Alternatively, this program may be distributed under the Perl
+    Artistic License, version 2.0.
+*/
+
 :- module( r_session,
           [
                r_open/0, r_open/1, r_start/0,
@@ -63,16 +94,16 @@ and (R)-lists are translated in this fashion.  The goal "A <- B" translates to
 r_in( A <- B ).
 
 Although the library is primarily meant to be used as a research tool,
-it still provides access to many functions of the R system that may render it 
+it still provides access to many functions of the R system that may render it
 useful to a wider audience. The library provides access to R's plethora of vector and scalar
 functions. We adicipate that of particular interest to Prolog programmers might be the fact
 that the library can be used to create plots from Prolog objects.
 Notably creating plots from lists of numbers.
 
 There is a known issue with X11 when R is started without --interactive. R.pl runs by default
-the --interactive flag and try to surpress echo output. If you do get weird output, try 
-giving to r_open, option with(non_interactive). This is suboptimal for some tasks, but 
-might resolve other issues. There is a issue with Macs, where --interactive doesnot work. 
+the --interactive flag and try to surpress echo output. If you do get weird output, try
+giving to r_open, option with(non_interactive). This is suboptimal for some tasks, but
+might resolve other issues. There is a issue with Macs, where --interactive doesnot work.
 On Macs, you should use with(non_interactive). This can also be achieved using settings/2.
 
 These capabilities are illustrated in the following example :
@@ -100,10 +131,10 @@ rtest :-
      r_close.
 ==
 
-@author 	Nicos Angelopoulos
+@author		Nicos Angelopoulos
 @version	0:0:7
 @copyright	Nicos Angelopoulos
-@license	YAP: Artistic
+@license	GPL+SWI-exception or Artistic 2.0
 @see		ensure_loaded(library('../doc/packages/examples/R/r_demo.pl'))
 @see		http://www.r-project.org/
 */
@@ -117,7 +148,7 @@ rtest :-
 %   The order of search is: registered location, environment variable 'R_BIN' and path defined.
 %   On unix systems path defined is the first R executable in $PATH. On MS wins it is the latest
 %   Rterm.exe found by expand_file_name( 'C:/Program Files/R/R-*/bin/Rterm.exe', Candidates ).
-%   The value Rbin == =retract= retracts the current registered location. 
+%   The value Rbin == =retract= retracts the current registered location.
 %   Rbin == =test=, succeeds if an R location has been registered.
 %
 r_bin( Rbin ) :-
@@ -152,7 +183,7 @@ r_open :-
      r_open( [] ).
 
 %%   r_start
-% 
+%
 %    Only start and session via r_open/1, if no open session existss.
 %
 r_start :-
@@ -176,7 +207,7 @@ r_start :-
 %	session to the bottom of the pile.
 %
 %       * at_r_halt(RHAction)
-%	R slaves used to halt when they encounter  an error. 
+%	R slaves used to halt when they encounter  an error.
 %    This is no longer the case but this option is still present in case
 %    it is useful in the future. This option provides a handle to changing
 %    the  behaviour of the session when a halt of the R-slave occurs.
@@ -216,7 +247,7 @@ r_start :-
 %       However you get alot all the echos of what you pipe in, back from R.
 %
 r_open( Opts ) :-
-     findall( S, r_session:settings(r_open_opt,S), Set ), 
+     findall( S, r_session:settings(r_open_opt,S), Set ),
      append( Opts, Set, All ),
      r_open_1( All, _R, false ).
 
@@ -580,7 +611,7 @@ r_verbosity( Level ) :-
 %    same structure as in r_session_version/1 ie M:N:F.
 %
 r_bin_version( Version ) :-
-     r_bin( R ), 
+     r_bin( R ),
      r_bin_version( R, Version ).
 
 %% r_bin_version( +Rbin, -Version )
@@ -606,21 +637,21 @@ r_bin_version( R, Version ) :-
 %    :- multifile settings/2.
 %    r_session:settings(r_open_opt,with(non_interactive)).
 % ==
-% 
+%
 %       * atom_is_r_function
 %                        expands atoms such as x11 to r function calls x11()
-% 
+%
 %       * r_function_def/1
-%                        where the argument is an R function. This hook allows default argument values to R functions. 
+%                        where the argument is an R function. This hook allows default argument values to R functions.
 %                        Only Arg=Value pairs are allowed.
 %
 % ==
 % :- multifile settings/2.
-% r_session:settings(r_function_def(x11),width=5). 
-% 
+% r_session:settings(r_function_def(x11),width=5).
+%
 % ==
 
- 
+
 
 %%% Section: Auxiliary predicates
 
@@ -890,7 +921,7 @@ r_input_normative( PrvThis, This ) :-
                          (settings(atom_is_r_function,PrvThis),Name=PrvThis) )
                               ->
                               r_function_has_default_args_tuple( Name, Tuple ),
-                              ( Tuple \== '' -> 
+                              ( Tuple \== '' ->
                                    atoms_concat( [Name,'(',Tuple,')'], This )
                                    ;
                                    This = PrvThis
@@ -1044,14 +1075,14 @@ r_record_history( false, Alias, This ) :-
      assert( r_session_history(Alias,[This|Old]) ).
 r_record_history( false, _, _ ). % fold with true if assumption is correct
 
-r_read_lines_1( eof, _TermLine, Ij, _Ro, Lines ) :- 
-     !,  
+r_read_lines_1( eof, _TermLine, Ij, _Ro, Lines ) :-
+     !,
      interject_error( Ij ),
      Lines = [].
 r_read_lines_1( end_of_file, _TermLine, _Ij, _Ro, Lines ) :- !, Lines = [].
 r_read_lines_1( [255], _TermLine, _Ij, _Ro, Lines ) :- !, Lines = [].
      % yap idiosyncrasy
-r_read_lines_1( TermLine, TermLine, Ij, _Ro, Lines ) :- 
+r_read_lines_1( TermLine, TermLine, Ij, _Ro, Lines ) :-
      !,
      interject_error( Ij ),
      Lines = [].
@@ -1087,7 +1118,7 @@ r_boolean( Boo, Rboo ) :-
      */
 r_read_obj( [L|Ls], Pv ) :-
      r_head_line_recognizes_and_reads( L, Ls, Pv ).
-     
+
 % list
 r_head_line_recognizes_and_reads( [0'[,0'[|T], Ls, Pv ) :-
      !,
@@ -1114,7 +1145,7 @@ r_head_line_recognizes_and_reads( [0' |T], Ls, Pv ) :-
           % maybe we can avoid coming here, this terminal has no width restriction...
           read_table_section( Left, Rnames, Entries ),
           r_head_line_recognizes_and_reads( [0' |T1], Right, PvT ),
-          % do loads of error checking from here on 
+          % do loads of error checking from here on
           clean_up_matrix_headers( Rnames, NRnames ),
           PvT = tbl(NRnames,CnamesR,MatR),
           append_matrices_on_columns( Entries, MatR, Mat ),
@@ -1296,7 +1327,7 @@ r_bin_arguments( Opts, _Rbin, Args, Interactive ) :-
                Args = ['`--slave'|RArgs]
           )
           */
-          ( select(with(non_interactive),Opts,NonIOpts) -> 
+          ( select(with(non_interactive),Opts,NonIOpts) ->
                Args = ['--slave'|RArgs],
                Interactive = false
                ;
@@ -1327,7 +1358,7 @@ r_opt_exec_no( [H|T], Ws, Exec ) :-
      r_opt_exec_no( T, Ws, TExec ).
 
 r_bin_arguments_complement( [], Ws, [] ) :-
-     ( Ws == [] -> 
+     ( Ws == [] ->
           true
           ;
           write( user_error, unrecognized_with_opts(Ws) ),
@@ -1405,13 +1436,13 @@ r_lines( Streams, ROstream, Interactive, InJ, Lines, ToInterj ) :-
      ( ROstream == error ->
           Mess = 'message("prolog_eoc")',
           Trmn = "prolog_eoc",
-          r_streams_data( output,  Streams, Ruo ), 
+          r_streams_data( output,  Streams, Ruo ),
           AllIj = InJ
           ;
           Ruo = Ro,
           Mess = 'print("prolog_eoc")',
-          Trmn = "[1] \"prolog_eoc\"", 
-          ( Interactive == true -> 
+          Trmn = "[1] \"prolog_eoc\"",
+          ( Interactive == true ->
                append( InJ, ["print(\"prolog_eoc\")"], AllIj )
                ;
                AllIj = InJ
@@ -1423,7 +1454,7 @@ r_lines( Streams, ROstream, Interactive, InJ, Lines, ToInterj ) :-
      r_read_lines( Ro, AllIj, Trmn, Lines ),
      % read_line_to_codes( Ro, Line ), atom_codes( AtLine, Line ), atom_codes( AtTrmn, Trmn ),
      % write( nxt_was(AtLine,AtTrmn) ), nl,
-     ( (Interactive == true, ROstream == error) -> 
+     ( (Interactive == true, ROstream == error) ->
                ToInterj = [MessLine]
                ;
                % consume_interactive_line( true, MessLine, Ruo ),
@@ -1498,13 +1529,13 @@ locate_rbin( Ssh, RBin ) :-
      locate_rbin_file( File ),
      ( var(Ssh) ->
           ( current_prolog_flag(windows,true),
-               ( atom_concat(_,exe,File) -> 
+               ( atom_concat(_,exe,File) ->
                     RBin = File         % this if and its then part are only needed because
                                         % currrent Yap implementation is broken
                     ;
                     file_name_extension( File, exe, RBin )
                )
-               ; 
+               ;
                RBin = File
           ),
           exists_file( RBin )
@@ -1532,7 +1563,7 @@ r_bin_wins( Rbin ) :-
      r_expand_wins_rterm( Stem, Candidates ),
      r_verbose( wins_candidates(Candidates), 3 ),
      Candidates \== [],
-     ( Candidates = [Rbin] -> 
+     ( Candidates = [Rbin] ->
           true
           ;
           maplist( atom_concat(Stem), Tails, Candidates ),
@@ -1563,7 +1594,7 @@ r_bin_warning :-
      nl,
      write( 'is not behaving as expected on your installed R binary.' ), nl,
      write( 'R sessions with this binary will be started without this flag.' ),
-     nl, 
+     nl,
      write( 'As a result, graphic windows will suffer and the connection is' ),
      write( ' more flaky.' ), nl,
      write( 'If you want to overcome these limitations we strongly suggest' ),
@@ -1595,7 +1626,7 @@ r_bin_takes_interactive( Rbin ) :-
      assert( r_bin_takes_interactive(Rbin,Bool) ),
      write( Ri, 'q()' ), nl( Ri ),
      flush_output( Ri ),
-     read_line_to_codes( Re, _ReLn ), 
+     read_line_to_codes( Re, _ReLn ),
      % write( Ri, 'message("whatever")' ), nl( Ri ),
      close( Ri ), close( Ro ), close( Re ),
      Bool == true.
@@ -1604,7 +1635,7 @@ consume_interactive_line( true, Line, Rstream ) :-
      read_line_to_codes( Rstream, Codes ),
      atom_codes( Found, Codes ),
      % ( var(Line) -> write( consuming_var(Found) ), nl; true ),
-     ( Codes = Line -> 
+     ( Codes = Line ->
           true
           ;
           atom_codes( Atm, Line ),
@@ -1614,7 +1645,7 @@ consume_interactive_line( false, _, _ ).
 
 cohese_r_function_args( [], Defs, Defs ).
 cohese_r_function_args( [H|T], Defs, [H|R] ) :-
-     ( (\+ var(H), H = (N=_V),select(N=_V1,Defs,RemDefs)) -> 
+     ( (\+ var(H), H = (N=_V),select(N=_V1,Defs,RemDefs)) ->
                true
                ;
                RemDefs = Defs
@@ -1679,7 +1710,7 @@ r_bin_version_pl_stream( R, Streams, Ro, Mj:Mn:Fx ) :-
      number_codes( Mj, MjCs ),
      number_codes( Mn, MnCs ),
      number_codes( Fx, FxCs ).
-     
+
 r_expand_wins_rterm( Stem, Candidates ) :-
      Stem = 'C:/Program Files/R/R-',
      Psfx = '*/bin/Rterm.exe',
@@ -1687,11 +1718,11 @@ r_expand_wins_rterm( Stem, Candidates ) :-
      expand_file_name( Search, Candidates1 ),
      % on 64 bit machines Rterm.exe is placed in subdir R-1.12.1
      Psfx2= '*/bin',
-     atom_concat( Stem, Psfx2, SearchBin ), 
+     atom_concat( Stem, Psfx2, SearchBin ),
      expand_file_name( SearchBin, BinFolders ),
      findall( CandidateList, (
                                    member(Bin,BinFolders),
-                                   atom_concat( Bin, '/*/Rterm.exe', NestSearch ), 
+                                   atom_concat( Bin, '/*/Rterm.exe', NestSearch ),
                                    expand_file_name( NestSearch, CandidateList )
                               ),
                                         NestedCandidates ),
