@@ -6,9 +6,9 @@
 \makeindex
 
 \onefile
-\htmloutput{html}				% Output directory
-\htmlmainfile{index}				% Main document file
-\bodycolor{white}				% Page colour
+\htmloutput{.}				% Output directory
+\htmlmainfile{R}			% Main document file
+\bodycolor{white}			% Page colour
 \sloppy
 
 \renewcommand{\runningtitle}{SWI-Prolog interface to R}

@@ -32,7 +32,7 @@ LIBPL=		R.pl
 LIBALL=		$(LIBPL) $(SUPPORT)
 EXAMPLES=	r_demo.pl
 
-all:		
+all:
 		@echo "Nothing to do for this package"
 
 install:	$(LIBPL)
@@ -79,8 +79,6 @@ SUBTEX=		rdoc.tex
 
 $(HTML):	$(TEX)
 		latex2html $(DOC)
-		mv html/index.html $@
-		rmdir html
 
 $(PDF):		$(TEX) $(SUBTEX)
 		$(RUNTEX) --pdf $(DOC)
