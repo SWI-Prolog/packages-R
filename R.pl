@@ -207,15 +207,15 @@ r_start :-
 %	session to the bottom of the pile.
 %
 %       * at_r_halt(RHAction)
-%	R slaves used to halt when they encounter  an error.
-%    This is no longer the case but this option is still present in case
-%    it is useful in the future. This option provides a handle to changing
-%    the  behaviour of the session when a halt of the R-slave occurs.
-%    RHAction should be one of =abort=, =fail=, call/1,
+%	R slaves used to halt when they encounter an error. This is no
+%	longer the case but this option is still present in case it is
+%	useful in the future. This option provides a handle to changing
+%	the behaviour of the session when a halt of the R-slave occurs.
+%	RHAction should be one of =abort=, =fail=, call/1,
 %	call_ground/1, =reinstate= or =restart=. Default is =fail=. When
-%	RHAction is =reinstate=, the history of   the session is used to
+%	RHAction is =reinstate=, the history of the session is used to
 %	roll-back all the commands sent so far. At `restart' the session
-%	is restarted with same name  and   options,  but  history is not
+%	is restarted with same name and options, but history is not
 %	replayed.
 %
 %       * copy(CopyTo,CopyWhat)
@@ -224,7 +224,7 @@ r_start :-
 %	once(File) or many(File). In the  case   of  many(File), file is
 %	opened and closed at each write   operation.  CopyWhat should be
 %	one of =both=, =in=, =out= or =none=. Default is no recording
-%    (CopyTo = =null=).
+%       (CopyTo = =null=).
 %
 %       * ssh(Host)
 %       * ssh(Host,Dir)
@@ -233,18 +233,21 @@ r_start :-
 %
 %
 %       * rbin(Rbin)
-%       R executable location to use for this open operation.
-%       If the option is not present binary registered with r_bin/1 and
-%       environment variable R_BIN are examined for the full location of
-%       the R binary. In MS windows Rbin should point to Rterm.exe. Also see r_bin/1.
+%	R executable location to use for this open operation. If the
+%	option is not present binary registered with r_bin/1 and
+%	environment variable R_BIN are examined for the full location of
+%	the R binary. In MS windows Rbin should point to Rterm.exe. Also
+%	see r_bin/1.
 %
 %       * with(With)
-%       With is in [environ,non_interactive,restore,save]. The   default behaviour is to
-%       start the R executable  with  flags =|interactive --no-environ --no-restore
-%       --no-save|=. For each With value  found in Opts the corresponding
-%       =|--no-|= flag is removed. In the case of non_interactive,  it removes the default --interactive.
-%       This makes the connection more robust, and allows proper x11 plots in linux.
-%       However you get alot all the echos of what you pipe in, back from R.
+%	With is in [environ,non_interactive,restore,save]. The default
+%	behaviour is to start the R executable with flags =|interactive
+%	--no-environ --no-restore --no-save|=. For each With value found
+%	in Opts the corresponding =|--no-|= flag is removed. In the case
+%	of non_interactive, it removes the default --interactive. This
+%	makes the connection more robust, and allows proper x11 plots in
+%	linux. However you get alot all the echos of what you pipe in,
+%	back from R.
 %
 r_open( Opts ) :-
      findall( S, r_session:settings(r_open_opt,S), Set ),
@@ -627,30 +630,31 @@ r_bin_version( R, Version ) :-
 
 %% settings( +Setting, +Value )
 %
-%    Multifile hook-predicate that allows for user settings to sip through. Currently the following are recognised:
+%    Multifile hook-predicate that allows for user settings to sip
+%    through. Currently the following are recognised:
 %
 %       * r_open_opt
+%	These come after any options given explicitly to r_open/1. For
+%	example on a Mac to avoid issue with --interactive use the
+%	following before querring r_open/0,1.
 %
-%    These come after any options given explicitly to r_open/1. For example on a Mac to avoid issue with --interactive  use the
-%    following before querring r_open/0,1.
-% ==
-%    :- multifile settings/2.
-%    r_session:settings(r_open_opt,with(non_interactive)).
-% ==
+%         ==
+%         :- multifile settings/2.
+%         r_session:settings(r_open_opt,with(non_interactive)).
+%         ==
 %
 %       * atom_is_r_function
-%                        expands atoms such as x11 to r function calls x11()
+%	expands atoms such as x11 to r function calls x11()
 %
-%       * r_function_def/1
-%                        where the argument is an R function. This hook allows default argument values to R functions.
-%                        Only Arg=Value pairs are allowed.
+%       * r_function_def(+Function)
+%       where Function is an R function. This hook allows default
+%	argument values to R functions. Only Arg=Value pairs are
+%	allowed.
 %
-% ==
-% :- multifile settings/2.
-% r_session:settings(r_function_def(x11),width=5).
-%
-% ==
-
+%         ==
+%         :- multifile settings/2.
+%         r_session:settings(r_function_def(x11),width=5).
+%         ==
 
 
 %%% Section: Auxiliary predicates
