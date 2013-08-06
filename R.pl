@@ -1455,7 +1455,7 @@ r_lines( Streams, ROstream, Interactive, InJ, Lines, ToInterj ) :-
      Excp = error(io_error(write, _), context(_,_)),
      catch( (write(Ri,Mess),nl(Ri),flush_output(Ri)), Excp, true ),
      atom_codes( Mess, MessLine ),
-     r_read_lines( Ro, AllIj, Trmn, Lines ),
+     r_read_lines( Ruo, AllIj, Trmn, Lines ),
      % read_line_to_codes( Ro, Line ), atom_codes( AtLine, Line ), atom_codes( AtTrmn, Trmn ),
      % write( nxt_was(AtLine,AtTrmn) ), nl,
      ( (Interactive == true, ROstream == error) ->
