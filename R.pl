@@ -56,6 +56,7 @@
 
 :- use_module( library(lists) ).
 :- use_module( library(readutil) ). % read_line_to_codes/2.
+:- set_prolog_flag(double_quotes, codes).
 
 :- ( current_predicate(r_verbosity_level/1) -> true;
           assert(r_verbosity_level(0)) ).
@@ -868,9 +869,7 @@ r_input_normative( Obj<-Call, R, I, This, Rplc, NxI ) :-
      !,
      ( var(Obj) ->
           Rplc = [arp(R,Obj,ThisObj)],
-          number_codes( I, ICs ),
-          append( "pl_Rv_", ICs, RvCs ),
-          atom_codes( ThisObj, RvCs ),
+          atomic_list_concat([pl_Rv_, I], ThisObj),
           NxI is I + 1
           ;
           Rplc = [],
@@ -1484,7 +1483,7 @@ r_process_was_successful( Ri, Ro, Re, Interactive ) :-
      Trmn = "prolog_eoc",
      catch( (write(Ri,Mess),nl(Ri),flush_output(Ri)), Excp, true ),
      r_read_lines( Re, [], Trmn, Lines ),
-     consume_interactive_line( Interactive, "message(\"prolog_eoc\")", Ro ),
+     consume_interactive_line( Interactive, Mess, Ro ),
      r_lines_print( Lines, error, user_error ),
      ( (var(Excp),Lines==[]) ->
           true
@@ -1639,11 +1638,10 @@ consume_interactive_line( true, Line, Rstream ) :-
      read_line_to_codes( Rstream, Codes ),
      atom_codes( Found, Codes ),
      % ( var(Line) -> write( consuming_var(Found) ), nl; true ),
-     ( Codes = Line ->
+     ( Found = Line ->
           true
           ;
-          atom_codes( Atm, Line ),
-          fail_term(could_not_conusme_specific_echo_line(Atm)-Found )
+          fail_term(could_not_conusme_specific_echo_line(Line)-Found )
      ).
 consume_interactive_line( false, _, _ ).
 
