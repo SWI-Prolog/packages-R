@@ -1439,10 +1439,9 @@ r_lines( Streams, ROstream, Interactive, InJ, Lines, ToInterj ) :-
      ( ROstream == error ->
           Mess = 'message("prolog_eoc")',
           Trmn = "prolog_eoc",
-          r_streams_data( output,  Streams, Ruo ),
+          r_streams_data( output,  Streams, _Ruo ),
           AllIj = InJ
           ;
-          Ruo = Ro,
           Mess = 'print("prolog_eoc")',
           Trmn = "[1] \"prolog_eoc\"",
           ( Interactive == true ->
