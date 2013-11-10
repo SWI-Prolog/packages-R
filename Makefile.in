@@ -10,7 +10,7 @@ PLBASE=@PLBASE@
 PLARCH=@PLARCH@
 PL=@PL@
 PKGDOC=$(PLBASE)/doc/packages
-LIBDIR=$(PLBASE)/library
+PLLIBDIR=$(PLBASE)/library
 EXDIR=$(PKGDOC)/examples/R
 
 PUBLICPL=swipl
@@ -35,15 +35,15 @@ all:
 		@echo "Nothing to do for this package"
 
 install:	$(LIBPL)
-		mkdir -p $(DESTDIR)$(LIBDIR)
-		$(INSTALL_DATA) $(LIBALL) $(DESTDIR)$(LIBDIR)
+		mkdir -p $(DESTDIR)$(PLLIBDIR)
+		$(INSTALL_DATA) $(LIBALL) $(DESTDIR)$(PLLIBDIR)
 		$(PL) -f none -g make -t halt
 
 ln-install:	$(LIBPL)
-		mkdir -p $(DESTDIR)$(LIBDIR)
+		mkdir -p $(DESTDIR)$(PLLIBDIR)
 		for f in $(LIBALL); do \
-		    rm -f $(DESTDIR)$(LIBDIR)/$$f; \
-		    ln -s `pwd`/$$f $(DESTDIR)$(LIBDIR); \
+		    rm -f $(DESTDIR)$(PLLIBDIR)/$$f; \
+		    ln -s `pwd`/$$f $(DESTDIR)$(PLLIBDIR); \
 		done
 		$(PL) -f none -g make -t halt
 
@@ -60,7 +60,7 @@ install-examples::
 		(cd examples && $(INSTALL_DATA) $(EXAMPLES) $(DESTDIR)$(EXDIR))
 
 uninstall::
-		rm -f $(LIBDIR)/plunit.pl
+		rm -f $(PLLIBDIR)/plunit.pl
 		$(PL) -f none -g make -t halt
 
 check::
